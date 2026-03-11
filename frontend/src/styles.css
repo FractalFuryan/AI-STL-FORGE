@@ -1,0 +1,159 @@
+:root {
+  --bg: #f6f6f2;
+  --ink: #1a1f28;
+  --panel: #ffffff;
+  --line: #d7dce5;
+  --accent: #0f8b8d;
+  --accent-2: #f4a261;
+  --danger: #b42318;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 600px at -20% -20%, #cde4e4, transparent 70%),
+    radial-gradient(900px 500px at 120% 120%, #ffe8cf, transparent 60%),
+    var(--bg);
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(320px, 430px) 1fr;
+  gap: 20px;
+  padding: 20px;
+}
+
+.left-panel,
+.preview-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(20, 24, 34, 0.08);
+}
+
+.left-panel {
+  padding: 20px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2rem;
+  letter-spacing: -0.04em;
+}
+
+.subtitle {
+  margin: 6px 0 20px;
+  color: #4f5b70;
+}
+
+.upload {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.grid-controls {
+  display: grid;
+  gap: 12px;
+}
+
+label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+
+input,
+select,
+button {
+  font: inherit;
+}
+
+.cta {
+  margin-top: 18px;
+  border: none;
+  background: linear-gradient(130deg, var(--accent), #167f98);
+  color: white;
+  border-radius: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.cta:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.thumb {
+  margin-top: 16px;
+  max-width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+
+.preview-panel {
+  min-height: 600px;
+  overflow: hidden;
+}
+
+.preview-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.preview-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(13, 16, 21, 0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #f8f8f2;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-panel {
+    min-height: 380px;
+  }
+}
