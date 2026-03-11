@@ -212,11 +212,16 @@ export default function App() {
               <option value="lithophane">Lithophane</option>
               <option value="emboss">Emboss</option>
               <option value="relief">Relief</option>
+              <option value="cookie-cutter">Cookie Cutter</option>
             </select>
           </label>
 
           {params.mode === "ai-depth" ? (
             <p className="subtitle">AI Depth uses a server-side depth model; preview is an approximate local heightmap.</p>
+          ) : null}
+
+          {params.mode === "cookie-cutter" ? (
+            <p className="subtitle">Cookie Cutter uses edge extraction on the server; preview shows a simplified shape mask.</p>
           ) : null}
 
           <label>

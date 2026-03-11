@@ -15,6 +15,7 @@ class STLGenerator:
         self._healthy = True
         self._last_health_check = 0.0
         self._health_check_interval = 60.0
+        self._max_faces = 500_000
 
     def is_healthy(self) -> bool:
         now = time.time()
@@ -47,6 +48,11 @@ class STLGenerator:
             return arr * params.max_height
 
         return self.image_to_heightmap(image_bytes, params)
+
+    def _load_image(self, image_bytes: bytes) -> Image.Image:
+        image = Image.open(io.BytesIO(image_bytes))
+        image = ImageOps.exif_transpose(image)
+        return image.copy()
 
     def image_to_heightmap(self, image_bytes: bytes, params: GenerationParams) -> np.ndarray:
         image = Image.open(io.BytesIO(image_bytes)).convert("L")
@@ -84,75 +90,15 @@ class STLGenerator:
 
         return arr * params.max_height
 
-    def heightmap_to_mesh(self, heightmap: np.ndarray, params: GenerationParams) -> trimesh.Trimesh:
-        h, w = heightmap.shape
-        scale_x = params.target_width_mm / max(w - 1, 1)
-        scale_y = params.target_width_mm * (h / max(w, 1)) / max(h - 1, 1)
-
-        top_vertices = np.zeros((h * w, 3), dtype=np.float32)
-        base_vertices = np.zeros((h * w, 3), dtype=np.float32)
-
-        for y in range(h):
-            for x in range(w):
-                idx = y * w + x
-                z = float(heightmap[y, x])
-                top_vertices[idx] = [x * scale_x, y * scale_y, z]
-                base_vertices[idx] = [x * scale_x, y * scale_y, -params.base_thickness]
-
-        vertices = np.vstack([top_vertices, base_vertices])
-        base_offset = h * w
-
-        faces: list[list[int]] = []
-
-        # Top and bottom surfaces.
-        for y in range(h - 1):
-            for x in range(w - 1):
-                v0 = y * w + x
-                v1 = y * w + (x + 1)
-                v2 = (y + 1) * w + x
-                v3 = (y + 1) * w + (x + 1)
-
-                faces.extend([[v0, v1, v2], [v1, v3, v2]])
-
-                b0 = base_offset + v0
-                b1 = base_offset + v1
-                b2 = base_offset + v2
-                b3 = base_offset + v3
-                faces.extend([[b0, b2, b1], [b1, b2, b3]])
-
-        # Front and back walls.
-        for x in range(w - 1):
-            t0 = x
-            t1 = x + 1
-            b0 = base_offset + x
-            b1 = base_offset + x + 1
-            faces.extend([[t0, b0, t1], [t1, b0, b1]])
-
-            tf0 = (h - 1) * w + x
-            tf1 = (h - 1) * w + x + 1
-            bf0 = base_offset + tf0
-            bf1 = base_offset + tf1
-            faces.extend([[tf0, tf1, bf0], [tf1, bf1, bf0]])
-
-        # Left and right walls.
-        for y in range(h - 1):
-            t0 = y * w
-            t1 = (y + 1) * w
-            b0 = base_offset + t0
-            b1 = base_offset + t1
-            faces.extend([[t0, t1, b0], [t1, b1, b0]])
-
-            tr0 = y * w + (w - 1)
-            tr1 = (y + 1) * w + (w - 1)
-            br0 = base_offset + tr0
-            br1 = base_offset + tr1
-            faces.extend([[tr0, br0, tr1], [tr1, br0, br1]])
-
-        mesh = trimesh.Trimesh(vertices=vertices, faces=np.asarray(faces), process=False)
+    def _postprocess_mesh(self, mesh: trimesh.Trimesh, params: GenerationParams) -> trimesh.Trimesh:
         mesh.update_faces(mesh.nondegenerate_faces())
         mesh.update_faces(mesh.unique_faces())
         mesh.remove_unreferenced_vertices()
-        mesh.fix_normals()
+        try:
+            mesh.fix_normals()
+        except Exception:
+            # Continue with exportable geometry even if winding repair fails.
+            pass
 
         if params.adaptive_remesh and len(mesh.faces) > 10_000:
             try:
@@ -160,14 +106,143 @@ class STLGenerator:
             except Exception:
                 pass
 
+        # Align base to Z=0 for slicer-friendly output.
+        z_min = float(mesh.bounds[0][2])
+        if z_min != 0.0:
+            mesh.apply_translation([0.0, 0.0, -z_min])
+
         return mesh
 
+    def heightmap_to_mesh(self, heightmap: np.ndarray, params: GenerationParams) -> trimesh.Trimesh:
+        h, w = heightmap.shape
+        estimated_faces = ((h - 1) * (w - 1) * 4) + ((h - 1) * 4) + ((w - 1) * 4)
+        if estimated_faces > self._max_faces:
+            raise ValueError(f"Generated mesh exceeds face limit ({self._max_faces}).")
+
+        scale_x = params.target_width_mm / max(w - 1, 1)
+        scale_y = params.target_width_mm * (h / max(w, 1)) / max(h - 1, 1)
+
+        x = np.arange(w, dtype=np.float32) * scale_x
+        y = np.arange(h, dtype=np.float32) * scale_y
+        xx, yy = np.meshgrid(x, y)
+
+        top_vertices = np.column_stack([xx.ravel(), yy.ravel(), heightmap.ravel()])
+        base_vertices = np.column_stack(
+            [xx.ravel(), yy.ravel(), np.full(h * w, -params.base_thickness, dtype=np.float32)]
+        )
+        vertices = np.vstack([top_vertices, base_vertices])
+
+        grid = np.arange(h * w, dtype=np.int64).reshape(h, w)
+        base_offset = h * w
+
+        top_tri1 = np.column_stack([grid[:-1, :-1].ravel(), grid[:-1, 1:].ravel(), grid[1:, :-1].ravel()])
+        top_tri2 = np.column_stack([grid[:-1, 1:].ravel(), grid[1:, 1:].ravel(), grid[1:, :-1].ravel()])
+        bottom_tri1 = np.column_stack(
+            [
+                (base_offset + grid[:-1, :-1]).ravel(),
+                (base_offset + grid[1:, :-1]).ravel(),
+                (base_offset + grid[:-1, 1:]).ravel(),
+            ]
+        )
+        bottom_tri2 = np.column_stack(
+            [
+                (base_offset + grid[:-1, 1:]).ravel(),
+                (base_offset + grid[1:, 1:]).ravel(),
+                (base_offset + grid[1:, :-1]).ravel(),
+            ]
+        )
+
+        walls: list[np.ndarray] = []
+        walls.append(np.column_stack([grid[0, :-1], base_offset + grid[0, :-1], grid[0, 1:]]))
+        walls.append(np.column_stack([grid[0, 1:], base_offset + grid[0, :-1], base_offset + grid[0, 1:]]))
+        walls.append(np.column_stack([grid[-1, :-1], grid[-1, 1:], base_offset + grid[-1, :-1]]))
+        walls.append(np.column_stack([grid[-1, 1:], base_offset + grid[-1, 1:], base_offset + grid[-1, :-1]]))
+        walls.append(np.column_stack([grid[:-1, 0], grid[1:, 0], base_offset + grid[:-1, 0]]))
+        walls.append(np.column_stack([grid[1:, 0], base_offset + grid[1:, 0], base_offset + grid[:-1, 0]]))
+        walls.append(np.column_stack([grid[:-1, -1], base_offset + grid[:-1, -1], grid[1:, -1]]))
+        walls.append(np.column_stack([grid[1:, -1], base_offset + grid[:-1, -1], base_offset + grid[1:, -1]]))
+
+        faces = np.vstack([top_tri1, top_tri2, bottom_tri1, bottom_tri2, *walls])
+        mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
+        return self._postprocess_mesh(mesh, params)
+
+    def _create_cookie_cutter_mesh(self, image: Image.Image, params: GenerationParams) -> trimesh.Trimesh:
+        try:
+            import cv2
+        except ImportError as exc:
+            raise ValueError("Cookie cutter mode requires opencv-python-headless.") from exc
+
+        img = np.array(image.convert("L"), dtype=np.uint8)
+        edges = cv2.Canny(img, 50, 150)
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            raise ValueError("No shape detected in image for cookie cutter mode.")
+
+        contour = max(contours, key=cv2.contourArea)
+        epsilon = 0.01 * cv2.arcLength(contour, True)
+        simplified = cv2.approxPolyDP(contour, epsilon, True)
+        points = simplified[:, 0, :].astype(np.float32)
+        if len(points) < 3:
+            raise ValueError("Detected contour is too simple for cookie cutter mode.")
+
+        points -= points.min(axis=0)
+        max_dim = float(np.max(points.max(axis=0)))
+        if max_dim <= 0:
+            raise ValueError("Invalid contour geometry.")
+        scale = min(params.target_width_mm, 80.0) / max_dim
+        points *= scale
+
+        cutter_height = max(5.0, params.max_height)
+        wall_thickness = max(0.8, min(params.base_thickness, 4.0))
+
+        offset = points.astype(np.float64)
+        center = offset.mean(axis=0)
+        normals = center - offset
+        lengths = np.linalg.norm(normals, axis=1, keepdims=True) + 1e-6
+        inner = offset + (normals / lengths) * wall_thickness
+
+        if len(inner) < 3:
+            raise ValueError("Could not create inner cookie cutter wall.")
+
+        n = len(offset)
+        vertices = []
+        for pt in offset:
+            vertices.append([pt[0], pt[1], 0.0])
+            vertices.append([pt[0], pt[1], cutter_height])
+        for pt in inner:
+            vertices.append([pt[0], pt[1], 0.0])
+            vertices.append([pt[0], pt[1], cutter_height])
+
+        faces: list[list[int]] = []
+        inner_base = 2 * n
+        for i in range(n):
+            j = (i + 1) % n
+
+            o0, o1 = 2 * i, 2 * j
+            o0t, o1t = o0 + 1, o1 + 1
+            i0, i1 = inner_base + 2 * i, inner_base + 2 * j
+            i0t, i1t = i0 + 1, i1 + 1
+
+            faces.extend([[o0, o1, o0t], [o1, o1t, o0t]])
+            faces.extend([[i0, i0t, i1], [i1, i0t, i1t]])
+            faces.extend([[o0t, i0t, o1t], [o1t, i0t, i1t]])
+            faces.extend([[o0, o1, i0], [o1, i1, i0]])
+
+        mesh = trimesh.Trimesh(vertices=np.asarray(vertices), faces=np.asarray(faces), process=False)
+        return self._postprocess_mesh(mesh, params)
+
     def generate_stl(self, image_bytes: bytes, params: GenerationParams) -> bytes:
-        heightmap = self.image_to_heightmap(image_bytes, params)
-        mesh = self.heightmap_to_mesh(heightmap, params)
+        if params.mode == "cookie-cutter":
+            mesh = self._create_cookie_cutter_mesh(self._load_image(image_bytes), params)
+        else:
+            heightmap = self.image_to_heightmap(image_bytes, params)
+            mesh = self.heightmap_to_mesh(heightmap, params)
         return mesh.export(file_type="stl")
 
     async def generate_stl_async(self, image_bytes: bytes, params: GenerationParams) -> bytes:
-        heightmap = await self.image_to_heightmap_async(image_bytes, params)
-        mesh = self.heightmap_to_mesh(heightmap, params)
+        if params.mode == "cookie-cutter":
+            mesh = self._create_cookie_cutter_mesh(self._load_image(image_bytes), params)
+        else:
+            heightmap = await self.image_to_heightmap_async(image_bytes, params)
+            mesh = self.heightmap_to_mesh(heightmap, params)
         return mesh.export(file_type="stl")

@@ -47,6 +47,11 @@ function imageToHeightmap(imageBitmap, resolution, maxHeight, gamma, mode) {
       continue;
     }
 
+    if (mode === "cookie-cutter") {
+      values[i] = mapped > 0.45 ? maxHeight * 0.7 : 0;
+      continue;
+    }
+
     values[i] = mapped * maxHeight;
   }
 

@@ -57,6 +57,38 @@ def test_generate_stl_heightmap(test_image_bytes):
     assert len(mesh.faces) > 0
 
 
+def test_generate_stl_cookie_cutter(cookie_image_bytes):
+    params = {
+        "mode": "cookie-cutter",
+        "cutter_height": 10.0,
+        "cutter_thickness": 2.0,
+        "target_width_mm": 90.0,
+    }
+
+    response = client.post(
+        "/api/generate-stl",
+        files={"image": ("cookie.png", cookie_image_bytes, "image/png")},
+        data={"params": json.dumps(params)},
+    )
+
+    assert response.status_code == 200
+    mesh = trimesh.load(io.BytesIO(response.content), file_type="stl")
+    assert len(mesh.vertices) > 0
+    assert len(mesh.faces) > 0
+    bounds = mesh.bounds
+    height = float(bounds[1][2] - bounds[0][2])
+    assert height == pytest.approx(10.0, rel=0.2)
+
+
+def test_generate_stl_cookie_cutter_no_shape(blank_image_bytes):
+    with pytest.raises(ValueError, match="No shape detected"):
+        client.post(
+            "/api/generate-stl",
+            files={"image": ("blank.png", blank_image_bytes, "image/png")},
+            data={"params": json.dumps({"mode": "cookie-cutter"})},
+        )
+
+
 def test_cache_hit_behavior(test_image_bytes):
     params = {"mode": "heightmap"}
 
@@ -115,6 +147,25 @@ def test_stats_endpoint():
     data = response.json()
     assert "cache_size_mb" in data
     assert "cache_entries" in data
+
+
+def test_batch_cookie_cutter(cookie_image_bytes):
+    params = {
+        "mode": "cookie-cutter",
+        "cutter_height": 9.0,
+        "cutter_thickness": 2.0,
+    }
+    response = client.post(
+        "/api/generate-batch",
+        files=[
+            ("images", ("cookie1.png", cookie_image_bytes, "image/png")),
+            ("images", ("cookie2.png", cookie_image_bytes, "image/png")),
+        ],
+        data={"params": json.dumps(params)},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/zip"
 
 
 def test_warmup_endpoint():

@@ -38,7 +38,7 @@ if [[ -z "$COMPOSE" ]]; then
 fi
 
 echo -e "\n${YELLOW}1/8 Starting stack${NC}"
-$COMPOSE up -d
+$COMPOSE up -d --build
 
 echo -e "\n${YELLOW}2/8 Waiting for services${NC}"
 sleep 15
@@ -104,6 +104,21 @@ idat = zlib.compress(bytes(raw), level=9)
 png = sig + chunk(b"IHDR", ihdr) + chunk(b"IDAT", idat) + chunk(b"IEND", b"")
 with open("test_input.png", "wb") as f:
   f.write(png)
+
+# High-contrast shape image for cookie-cutter mode.
+raw2 = bytearray()
+for y in range(h):
+  raw2.append(0)
+  for x in range(w):
+    if 20 <= x <= 80 and 20 <= y <= 80:
+      raw2.append(0)
+    else:
+      raw2.append(255)
+
+idat2 = zlib.compress(bytes(raw2), level=9)
+png2 = sig + chunk(b"IHDR", ihdr) + chunk(b"IDAT", idat2) + chunk(b"IEND", b"")
+with open("test_cookie.png", "wb") as f:
+  f.write(png2)
 PY
 
 HTTP_CODE="$(curl -sS -w '%{http_code}' -o test_output.stl \
@@ -123,7 +138,25 @@ else
   exit 1
 fi
 
-echo -e "\n${YELLOW}6/8 Batch generation${NC}"
+echo -e "\n${YELLOW}6/9 Cookie cutter generation${NC}"
+COOKIE_CODE="$(curl -sS -w '%{http_code}' -o cookie_output.stl \
+  -F image=@test_cookie.png \
+  -F 'params={"mode":"cookie-cutter","cutter_height":10,"cutter_thickness":2}' \
+  http://localhost:8000/api/generate-stl)"
+if [[ "$COOKIE_CODE" != "200" ]]; then
+  echo -e "Cookie cutter... ${RED}failed (${COOKIE_CODE})${NC}"
+  exit 1
+fi
+
+COOKIE_SIZE="$(wc -c < cookie_output.stl)"
+if [[ "$COOKIE_SIZE" -gt 84 ]]; then
+  echo -e "Cookie cutter... ${GREEN}ok${NC} (${COOKIE_SIZE} bytes)"
+else
+  echo -e "Cookie cutter... ${RED}failed (too small)${NC}"
+  exit 1
+fi
+
+echo -e "\n${YELLOW}7/9 Batch generation${NC}"
 BATCH_CODE="$(curl -sS -w '%{http_code}' -o test_batch.zip \
   -F images=@test_input.png \
   -F images=@test_input.png \
@@ -141,7 +174,7 @@ else
   exit 1
 fi
 
-echo -e "\n${YELLOW}7/8 Metrics and logs${NC}"
+echo -e "\n${YELLOW}8/9 Metrics and logs${NC}"
 if curl -fsS http://localhost:8000/api/metrics >/dev/null; then
   echo -e "Metrics endpoint... ${GREEN}ok${NC}"
 else
@@ -155,9 +188,9 @@ else
   echo -e "Backend recent logs... ${YELLOW}${ERROR_LINES} potential error lines${NC}"
 fi
 
-echo -e "\n${YELLOW}8/8 Resource snapshot${NC}"
+echo -e "\n${YELLOW}9/9 Resource snapshot${NC}"
 docker stats --no-stream --format 'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}' || true
 
-rm -f test_input.png test_output.stl test_batch.zip
+rm -f test_input.png test_cookie.png test_output.stl cookie_output.stl test_batch.zip
 
 echo -e "\n${GREEN}Smoke test complete${NC}"
