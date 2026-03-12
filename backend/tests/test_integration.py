@@ -310,6 +310,43 @@ def test_busts_generate_and_random():
     assert len(mesh.faces) > 0
 
 
+def test_reconstruct_job_lifecycle(cookie_image_bytes):
+    start = client.post(
+        "/api/reconstruct/3d",
+        files={"image": ("subject.png", cookie_image_bytes, "image/png")},
+        data={
+            "model": "auto",
+            "preset": "balanced",
+            "target_height_mm": "120",
+            "output_format": "stl",
+            "repair": "true",
+            "decimate_ratio": "0.8",
+        },
+    )
+    assert start.status_code == 200
+    payload = start.json()
+    assert payload["status"] == "processing"
+    job_id = payload["job_id"]
+
+    status = client.get(f"/api/reconstruct/3d/status/{job_id}")
+    assert status.status_code == 200
+    status_payload = status.json()
+    assert status_payload["status"] in {"processing", "completed", "failed"}
+
+    # Background tasks typically complete within request cycle in TestClient.
+    if status_payload["status"] == "completed":
+        assert "download_url" in status_payload
+        assert "preview_url" in status_payload
+
+        download = client.get(f"/api/reconstruct/3d/download/{job_id}")
+        assert download.status_code == 200
+        assert len(download.content) > 0
+
+        preview = client.get(f"/api/reconstruct/3d/preview/{job_id}")
+        assert preview.status_code == 200
+        assert len(preview.content) > 0
+
+
 def test_warmup_endpoint():
     response = client.post("/api/health/warmup")
     if depth_estimator.check_available():

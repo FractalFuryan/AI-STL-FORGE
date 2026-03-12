@@ -1,5 +1,9 @@
 # AI-STL-FORGE
 
+[![CI](https://github.com/FractalFuryan/AI-STL-FORGE/actions/workflows/ci.yml/badge.svg)](https://github.com/FractalFuryan/AI-STL-FORGE/actions)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-ready-green)](https://fastapi.tiangolo.com)
+
 AI STL Forge converts images into 3D printable STL files using a production-ready FastAPI backend and a real-time React + Three.js frontend.
 
 [![Python](https://img.shields.io/badge/python-3.12-blue?style=for-the-badge&logo=python)](https://python.org)
@@ -27,6 +31,39 @@ AI STL Forge converts images into 3D printable STL files using a production-read
 - Modular dungeon kit ZIP generation
 - Character customization endpoint (weapon/scale choices)
 - Multi-view reconstruction endpoint (front/side/top images)
+
+### AI Reconstruction Pipeline
+
+AI reconstruction supports single-image to printable mesh jobs with asynchronous status tracking.
+
+Pipeline stages:
+
+1. Upload validation (MIME allowlist, decode check, size and dimension limits)
+2. Optional background removal
+3. Depth estimation
+4. Single-image 3D reconstruction (preset-driven model selection)
+5. Mesh repair and decimation
+6. Print alignment, scaling, and export
+
+Reconstruction presets:
+
+| Preset | Model | Description |
+|------|------|------|
+| `fast` | TripoSR | Fast draft reconstruction |
+| `balanced` | SF3D | Recommended quality/speed default |
+| `high` | SF3D | Higher-detail profile |
+
+Outputs:
+
+- `stl` for print workflows
+- `glb` for browser preview
+
+Reconstruction API:
+
+- `POST /api/reconstruct/3d`
+- `GET /api/reconstruct/3d/status/{job_id}`
+- `GET /api/reconstruct/3d/download/{job_id}`
+- `GET /api/reconstruct/3d/preview/{job_id}`
 
 ## Latest Update: Bust Generation System
 
