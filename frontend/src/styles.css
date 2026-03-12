@@ -104,6 +104,33 @@ button {
   border: 1px solid var(--line);
 }
 
+.bust-panel {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px dashed var(--line);
+}
+
+.bust-panel h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+}
+
+.bust-controls {
+  margin-top: 10px;
+}
+
+.button-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.secondary {
+  background: linear-gradient(130deg, #f08b47, #cf6f2f);
+}
+
 .preview-panel {
   min-height: 600px;
   overflow: hidden;

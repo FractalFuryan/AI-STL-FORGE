@@ -49,6 +49,31 @@ export default function App() {
     target_width_mm: 100,
     adaptive_remesh: false,
   });
+  const [bustStyle, setBustStyle] = useState("classical");
+  const [bustHeight, setBustHeight] = useState(80);
+  const [bustResolution, setBustResolution] = useState(96);
+  const [bustBusy, setBustBusy] = useState(false);
+  const [bustError, setBustError] = useState("");
+  const [fantasyRace, setFantasyRace] = useState("human");
+  const [bustIncludeBase, setBustIncludeBase] = useState(true);
+  const [bustHelmet, setBustHelmet] = useState(false);
+  const [bustCrown, setBustCrown] = useState(false);
+  const [bustBeard, setBustBeard] = useState(false);
+
+  const bustStyles = [
+    "classical",
+    "fantasy",
+    "sci_fi",
+    "steampunk",
+    "gothic",
+    "cartoon",
+    "anime",
+    "realistic",
+    "heroic",
+    "villainous",
+    "alien",
+    "robot",
+  ];
 
   const canGenerate = useMemo(() => !!imageFile && !busy, [imageFile, busy]);
   const {
@@ -179,6 +204,82 @@ export default function App() {
       setError(e instanceof Error ? e.message : "Generation failed");
     } finally {
       setBusy(false);
+    }
+  }
+
+  function getBustParams() {
+    const payload = {
+      include_base: bustIncludeBase,
+    };
+
+    if (bustStyle === "fantasy" || bustStyle === "villainous" || bustStyle === "gothic" || bustStyle === "alien" || bustStyle === "steampunk") {
+      payload.race = fantasyRace;
+      payload.has_helmet = bustHelmet;
+      payload.has_crown = bustCrown;
+      payload.has_beard = bustBeard;
+    }
+
+    return payload;
+  }
+
+  async function generateBust() {
+    setBustBusy(true);
+    setBustError("");
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/busts/generate/${bustStyle}?resolution=${bustResolution}&height=${bustHeight}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(getBustParams()),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Bust request failed with status ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${bustStyle}_bust.stl`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setBustError(e instanceof Error ? e.message : "Bust generation failed");
+    } finally {
+      setBustBusy(false);
+    }
+  }
+
+  async function randomBust() {
+    setBustBusy(true);
+    setBustError("");
+
+    const seed = Math.floor(Math.random() * 10000);
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/busts/random/${bustStyle}?seed=${seed}&resolution=${bustResolution}&height=${bustHeight}`,
+        { method: "POST" },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Random bust request failed with status ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${bustStyle}_random_${seed}.stl`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setBustError(e instanceof Error ? e.message : "Random bust generation failed");
+    } finally {
+      setBustBusy(false);
     }
   }
 
@@ -322,6 +423,93 @@ export default function App() {
         {error && <p className="error">{error}</p>}
 
         {imageUrl && <img className="thumb" src={imageUrl} alt="input preview" />}
+
+        <div className="bust-panel">
+          <h2>Bust Generator</h2>
+          <p className="subtitle">Generate collectible bust STLs without uploading an image.</p>
+
+          <div className="grid-controls bust-controls">
+            <label>
+              Style
+              <select value={bustStyle} onChange={(e) => setBustStyle(e.target.value)}>
+                {bustStyles.map((style) => (
+                  <option key={style} value={style}>
+                    {style.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {(bustStyle === "fantasy" || bustStyle === "villainous" || bustStyle === "gothic" || bustStyle === "alien" || bustStyle === "steampunk") ? (
+              <>
+                <label>
+                  Race
+                  <select value={fantasyRace} onChange={(e) => setFantasyRace(e.target.value)}>
+                    <option value="human">human</option>
+                    <option value="elf">elf</option>
+                    <option value="dwarf">dwarf</option>
+                    <option value="orc">orc</option>
+                  </select>
+                </label>
+                <label>
+                  Helmet
+                  <input type="checkbox" checked={bustHelmet} onChange={(e) => setBustHelmet(e.target.checked)} />
+                </label>
+                <label>
+                  Crown
+                  <input type="checkbox" checked={bustCrown} onChange={(e) => setBustCrown(e.target.checked)} />
+                </label>
+                <label>
+                  Beard
+                  <input type="checkbox" checked={bustBeard} onChange={(e) => setBustBeard(e.target.checked)} />
+                </label>
+              </>
+            ) : null}
+
+            <label>
+              Height (mm)
+              <input
+                type="range"
+                min="20"
+                max="300"
+                step="1"
+                value={bustHeight}
+                onChange={(e) => setBustHeight(Number(e.target.value))}
+              />
+              <strong>{bustHeight}</strong>
+            </label>
+
+            <label>
+              Quality
+              <select value={bustResolution} onChange={(e) => setBustResolution(Number(e.target.value))}>
+                <option value={48}>Draft 48</option>
+                <option value={64}>Balanced 64</option>
+                <option value={96}>Quality 96</option>
+                <option value={128}>High 128</option>
+              </select>
+            </label>
+
+            <label>
+              Include Base
+              <input
+                type="checkbox"
+                checked={bustIncludeBase}
+                onChange={(e) => setBustIncludeBase(e.target.checked)}
+              />
+            </label>
+          </div>
+
+          <div className="button-row">
+            <button className="cta" disabled={bustBusy} onClick={generateBust}>
+              {bustBusy ? "Generating..." : "Generate Bust STL"}
+            </button>
+            <button className="cta secondary" disabled={bustBusy} onClick={randomBust}>
+              {bustBusy ? "Generating..." : "Random Bust"}
+            </button>
+          </div>
+
+          {bustError ? <p className="error">{bustError}</p> : null}
+        </div>
       </section>
 
       <section className="preview-panel">

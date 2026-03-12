@@ -15,3 +15,27 @@ class GenerationParams(BaseModel):
     cutter_height: float = Field(default=10.0, ge=5.0, le=30.0)
     cutter_thickness: float = Field(default=2.0, ge=0.8, le=5.0)
     adaptive_remesh: bool = False
+
+
+class TabletopParametricRequest(BaseModel):
+    category: Literal["human", "creature", "terrain", "prop"] = "human"
+    params: dict = Field(default_factory=dict)
+
+
+class TabletopKitRequest(BaseModel):
+    kit_type: Literal["dungeon"] = "dungeon"
+    num_pieces: int = Field(default=10, ge=1, le=50)
+    variation: float = Field(default=0.3, ge=0.0, le=1.0)
+
+
+class TabletopCharacterRequest(BaseModel):
+    choices: dict = Field(default_factory=dict)
+    scale: float = Field(default=32.0, ge=10.0, le=120.0)
+
+
+class CreatureHybridRequest(BaseModel):
+    species1: str
+    params1: dict = Field(default_factory=dict)
+    species2: str
+    params2: dict = Field(default_factory=dict)
+    blend: float = Field(default=0.5, ge=0.0, le=1.0)

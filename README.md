@@ -21,6 +21,242 @@ AI STL Forge converts images into 3D printable STL files using a production-read
 | `ai-depth` | Optional neural depth estimation | Real depth from flat photos |
 | `cookie-cutter` | Outline-based cutter mesh | Cookie cutters and stamps |
 
+### Tabletop Toolkit (New)
+
+- Parametric miniature generation (`human`, `creature`, `terrain`, `prop`)
+- Modular dungeon kit ZIP generation
+- Character customization endpoint (weapon/scale choices)
+- Multi-view reconstruction endpoint (front/side/top images)
+
+## Latest Update: Bust Generation System
+
+### Bust Generation System
+
+Bust generation is now fully integrated end-to-end across the AI-STL-FORGE platform.
+
+The system uses a Signed Distance Field (SDF) procedural modeling engine to generate printable busts with customizable styles, proportions, and features.
+
+This release introduces:
+
+- Modular SDF bust generators
+- Backend REST API endpoints
+- Frontend bust generation UI
+- Integration tests
+- Docker smoke validation
+
+Bust generation is now part of the core procedural asset pipeline alongside:
+
+- Image to STL conversion
+- Cookie cutter generation
+- Heightmap and lithophane generation
+- Procedural creatures and terrain (in development)
+
+### Architecture Overview
+
+Bust generation is built on a modular SDF engine that constructs geometry using mathematical primitives instead of polygon sculpting.
+
+Key benefits:
+
+- Guaranteed watertight meshes
+- Smooth organic surfaces
+- Fully procedural variation
+- Highly customizable parameters
+- Fast mesh generation
+
+Bust geometry is composed from primitives such as:
+
+- `sphere`
+- `capsule`
+- `cylinder`
+- `cone`
+- `box`
+- `torus`
+
+These primitives are combined using operations such as:
+
+- `smooth_union`
+- `subtract`
+- `cut_plane`
+- `transform`
+
+The final mesh is extracted from sampled SDF fields and exported as STL.
+
+### Bust Module Structure
+
+```text
+backend/app/generators/sdf/busts/
+	base.py
+	classical.py
+	fantasy.py
+	factory.py
+	__init__.py
+```
+
+Core styles implemented:
+
+- `classical`
+- `fantasy`
+
+Additional styles are exposed through the factory architecture and can be implemented incrementally:
+
+- `sci_fi`
+- `steampunk`
+- `gothic`
+- `cartoon`
+- `anime`
+- `realistic`
+- `heroic`
+- `villainous`
+- `alien`
+- `robot`
+
+This modular design allows style generators to be added independently without changing the core pipeline.
+
+### API Endpoints
+
+Bust generation is available through the REST API.
+
+Catalog endpoints:
+
+- `GET /api/busts/styles`
+- `GET /api/busts/races`
+- `GET /api/busts/base-types`
+
+Generation endpoints:
+
+- `POST /api/busts/generate/{style}`
+- `POST /api/busts/random/{style}`
+
+Common parameters include:
+
+- `style`
+- `race`
+- `base_type`
+- `height`
+- `resolution`
+- `include_base`
+- feature flags (`helmet`, `crown`, `beard`, and related toggles)
+
+Responses return binary STL files ready for printing.
+
+### Frontend Bust Generator
+
+The frontend now includes a dedicated bust generator panel integrated into the main application.
+
+Controls include:
+
+- Style selector
+- Race selector
+- Bust base type
+- Height control
+- Mesh resolution and quality
+- Optional display base
+- Feature toggles (`helmet`, `crown`, `beard`, and related options)
+- Random bust generation
+
+Generated STL files download directly from the browser.
+
+### Testing and Validation
+
+Bust generation includes integration coverage and end-to-end validation.
+
+Backend tests:
+
+- 23 tests passing
+
+Coverage includes:
+
+- API catalog endpoints
+- STL generation endpoints
+- Random generation pipeline
+
+Frontend:
+
+- Production build successful
+
+End-to-end validation:
+
+- Docker smoke test passes with backend API, Redis, frontend, and mesh generation pipeline running successfully
+
+### Current Capabilities
+
+AI-STL-FORGE can now generate:
+
+Procedural models:
+
+- Character busts
+- Fantasy characters
+- Stylized portraits
+- Procedural geometry
+
+Image-based models:
+
+- Lithophanes
+- Heightmaps
+- Cookie cutters
+- Relief models
+
+Export:
+
+- Binary STL
+
+Ready for:
+
+- FDM printing
+- Resin printing
+- Tabletop miniatures
+- Display busts
+
+### Next Development Phase
+
+Upcoming work includes dedicated generators for additional bust styles:
+
+- `sci_fi`
+- `steampunk`
+- `gothic`
+- `anime`
+- `robot`
+- `alien`
+
+Each style will be implemented as an independent SDF module under:
+
+```text
+backend/app/generators/sdf/busts/
+```
+
+This keeps the architecture scalable while expanding the procedural asset library.
+
+### Why SDF Modeling?
+
+Traditional mesh modeling often leads to:
+
+- non-manifold geometry
+- broken meshes
+- boolean failures
+
+Signed Distance Fields solve this by defining shapes mathematically.
+
+Benefits:
+
+- perfectly closed surfaces
+- smooth blending between shapes
+- procedural variation
+- fast mesh extraction
+
+This makes SDFs ideal for procedural 3D printable assets.
+
+### Project Direction
+
+AI-STL-FORGE is evolving into a procedural 3D printing platform capable of generating:
+
+- tabletop miniatures
+- display busts
+- creatures
+- terrain
+- custom STL assets
+
+All powered by a scalable backend and procedural geometry engine.
+
 ### Mesh Pipeline
 
 - Vectorized heightmap mesh generation for faster builds on high resolutions.
@@ -132,6 +368,35 @@ Headers include:
 - `GET /api/health/ready`
 - `GET /api/health/ai`
 - `POST /api/health/warmup`
+
+### Tabletop Endpoints
+
+- `POST /api/tabletop/parametric/generate`
+- `POST /api/tabletop/modular/kit`
+- `POST /api/tabletop/character/customize`
+- `POST /api/tabletop/reconstruct`
+
+### Action Figure Endpoints
+
+- `POST /api/action-figure/extract-pose`
+- `POST /api/action-figure/generate`
+- `POST /api/action-figure/add-accessories`
+
+### Creature Engine Endpoints
+
+- `GET /api/creatures/species`
+- `GET /api/creatures/presets/{species}`
+- `POST /api/creatures/generate/{species}`
+- `POST /api/creatures/mutate/{species}`
+- `POST /api/creatures/hybrid`
+
+### Bust Endpoints
+
+- `GET /api/busts/styles`
+- `GET /api/busts/races`
+- `GET /api/busts/base-types`
+- `POST /api/busts/generate/{style}`
+- `POST /api/busts/random/{style}`
 
 ## Performance Notes
 

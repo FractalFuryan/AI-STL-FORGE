@@ -14,7 +14,11 @@ from fastapi.responses import JSONResponse, Response
 
 from app.middleware import rate_limiter, validate_limits
 from app.metrics import ACTIVE_REQUESTS, RATE_LIMIT_BLOCKED, REQUEST_COUNT, REQUEST_DURATION, render_metrics
+from app.routes.action_figure import router as action_figure_router
+from app.routes.busts import router as busts_router
+from app.routes.creatures import router as creatures_router
 from app.routes.generate import router as generate_router
+from app.routes.tabletop import router as tabletop_router
 from app.routes.generate import (
     get_cache,
     get_generator,
@@ -324,3 +328,7 @@ def health_ready():
 
 
 app.include_router(generate_router)
+app.include_router(tabletop_router)
+app.include_router(action_figure_router)
+app.include_router(creatures_router)
+app.include_router(busts_router)
