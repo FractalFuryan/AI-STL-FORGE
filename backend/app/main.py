@@ -19,6 +19,7 @@ from app.routes.busts import router as busts_router
 from app.routes.creatures import router as creatures_router
 from app.routes.generate import router as generate_router
 from app.routes.reconstruct import router as reconstruct_router
+from app.routes.statue import router as statue_router
 from app.routes.tabletop import router as tabletop_router
 from app.routes.generate import (
     get_cache,
@@ -334,3 +335,4 @@ app.include_router(action_figure_router)
 app.include_router(creatures_router)
 app.include_router(busts_router)
 app.include_router(reconstruct_router)
+app.include_router(statue_router)

@@ -1,16 +1,17 @@
 # AI-STL-FORGE
 
-[![CI](https://github.com/FractalFuryan/AI-STL-FORGE/actions/workflows/ci.yml/badge.svg)](https://github.com/FractalFuryan/AI-STL-FORGE/actions)
-[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-ready-green)](https://fastapi.tiangolo.com)
+<p align="left">
+  <a href="https://github.com/FractalFuryan/AI-STL-FORGE/actions">
+    <img src="https://github.com/FractalFuryan/AI-STL-FORGE/actions/workflows/ci.yml/badge.svg?style=flat-square" />
+  </a>
+  <img src="https://img.shields.io/badge/python-3.11-blue?style=flat-square" />
+  <img src="https://img.shields.io/badge/FastAPI-ready-green?style=flat-square" />
+  <img src="https://img.shields.io/badge/react-18-blue?style=flat-square" />
+  <img src="https://img.shields.io/badge/docker-ready-blue?style=flat-square" />
+  <img src="https://img.shields.io/badge/redis-rate--limiter-red?style=flat-square" />
+</p>
 
 AI STL Forge converts images into 3D printable STL files using a production-ready FastAPI backend and a real-time React + Three.js frontend.
-
-[![Python](https://img.shields.io/badge/python-3.12-blue?style=for-the-badge&logo=python)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
-[![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)](https://react.dev)
-[![Docker](https://img.shields.io/badge/docker-ready-2496ED?style=for-the-badge&logo=docker)](https://docker.com)
-[![Redis](https://img.shields.io/badge/redis-rate_limiter-DC382D?style=for-the-badge&logo=redis)](https://redis.io)
 
 ## Features
 
@@ -64,6 +65,25 @@ Reconstruction API:
 - `GET /api/reconstruct/3d/status/{job_id}`
 - `GET /api/reconstruct/3d/download/{job_id}`
 - `GET /api/reconstruct/3d/preview/{job_id}`
+
+### AI Statue Generator
+
+AI-STL-FORGE includes a dedicated single-image statue flow for printable bust-style outputs.
+
+Statue flow:
+
+1. Image upload validation
+2. Subject isolation
+3. Depth estimation
+4. Single-image reconstruction (SF3D or TripoSR)
+5. Mesh repair, optional base attachment (`none`, `pedestal`, `miniature`), and decimation
+6. STL + GLB export for print and preview
+
+Statue API:
+
+- `POST /api/statue/generate`
+
+The returned job uses the same status, preview, and download lifecycle endpoints as the reconstruction pipeline.
 
 ## Latest Update: Bust Generation System
 

@@ -21,6 +21,7 @@ const MODE_TABS = [
   { id: "ai-depth", label: "AI Depth", tag: "AI" },
   { id: "cookie-cutter", label: "Cookie Cutter" },
   { id: "reconstruct", label: "AI Reconstruct", tag: "AI" },
+  { id: "statue", label: "AI Statue", tag: "AI" },
   { id: "bust", label: "Bust Gen", tag: "New" },
 ];
 
@@ -79,6 +80,8 @@ export default function App() {
   const [bustError, setBustError] = useState("");
 
   const [reconstructPreset, setReconstructPreset] = useState("balanced");
+  const [reconstructModel, setReconstructModel] = useState("auto");
+  const [statueBaseType, setStatueBaseType] = useState("pedestal");
   const [reconstructHeightMm, setReconstructHeightMm] = useState(150);
   const [reconstructFormat, setReconstructFormat] = useState("stl");
   const [reconstructRepair, setReconstructRepair] = useState(true);
@@ -101,6 +104,7 @@ export default function App() {
 
   const isBustMode = activeMode === "bust";
   const isReconstructMode = activeMode === "reconstruct";
+  const isStatueMode = activeMode === "statue";
   const forgeBusy = busy || bustBusy || reconstructBusy;
   const canGenerate = isBustMode ? !forgeBusy : (!!imageFile && !forgeBusy);
 
@@ -356,15 +360,19 @@ export default function App() {
     try {
       const formData = new FormData();
       formData.append("image", imageFile);
-      formData.append("model", "auto");
+      formData.append("model", reconstructModel);
       formData.append("preset", reconstructPreset);
+      if (isStatueMode) {
+        formData.append("base_type", statueBaseType);
+      }
       formData.append("target_height_mm", String(reconstructHeightMm));
       formData.append("output_format", reconstructFormat);
       formData.append("repair", String(reconstructRepair));
       formData.append("decimate_ratio", String(reconstructDecimate));
       formData.append("remove_bg", String(reconstructRemoveBg));
 
-      const response = await fetch(`${API_BASE}/api/reconstruct/3d`, {
+      const endpoint = isStatueMode ? `${API_BASE}/api/statue/generate` : `${API_BASE}/api/reconstruct/3d`;
+      const response = await fetch(endpoint, {
         method: "POST",
         body: formData,
       });
@@ -386,7 +394,7 @@ export default function App() {
       generateBust(false);
       return;
     }
-    if (isReconstructMode) {
+    if (isReconstructMode || isStatueMode) {
       startReconstruction();
       return;
     }
@@ -470,7 +478,7 @@ export default function App() {
             {imageUrl ? <img className="thumb" src={imageUrl} alt="source" /> : null}
           </div>
 
-          {!isBustMode && !isReconstructMode ? (
+          {!isBustMode && !isReconstructMode && !isStatueMode ? (
             <>
               <div className="panel-section">
                 <div className="panel-section-title">Mesh Parameters</div>
@@ -551,9 +559,29 @@ export default function App() {
             </div>
           ) : (
             <div className="panel-section">
-              <div className="panel-section-title">AI Reconstruct</div>
+              <div className="panel-section-title">{isStatueMode ? "AI Statue" : "AI Reconstruct"}</div>
 
               <PresetSelector value={reconstructPreset} onChange={setReconstructPreset} />
+
+              <label className="param-row">
+                <div className="param-label"><span className="param-name">Model</span></div>
+                <select value={reconstructModel} onChange={(e) => setReconstructModel(e.target.value)}>
+                  <option value="auto">Auto</option>
+                  <option value="sf3d">SF3D</option>
+                  <option value="triposr">TripoSR</option>
+                </select>
+              </label>
+
+              {isStatueMode ? (
+                <label className="param-row">
+                  <div className="param-label"><span className="param-name">Base</span></div>
+                  <select value={statueBaseType} onChange={(e) => setStatueBaseType(e.target.value)}>
+                    <option value="none">none</option>
+                    <option value="pedestal">pedestal</option>
+                    <option value="miniature">miniature</option>
+                  </select>
+                </label>
+              ) : null}
 
               <label className="param-row">
                 <div className="param-label"><span className="param-name">Output</span></div>
@@ -590,7 +618,7 @@ export default function App() {
 
         <main className="viewport">
           <div className="viewport-header">
-            <span className="viewport-title">◈ 3D Preview — {isBustMode ? "Bust" : (isReconstructMode ? "AI Reconstruct" : params.mode)} Mode</span>
+            <span className="viewport-title">◈ 3D Preview — {isBustMode ? "Bust" : (isStatueMode ? "AI Statue" : (isReconstructMode ? "AI Reconstruct" : params.mode))} Mode</span>
             <div className="viewport-controls">
               <button type="button" className="vp-btn">Wireframe</button>
               <button type="button" className="vp-btn">Top</button>
@@ -605,10 +633,10 @@ export default function App() {
               maxHeight={params.max_height}
               mode={params.mode}
               loading={previewBusy || bustBusy || reconstructBusy}
-              modelUrl={(isBustMode || isReconstructMode) ? stlPreviewUrl : ""}
+              modelUrl={(isBustMode || isReconstructMode || isStatueMode) ? stlPreviewUrl : ""}
             />
-            {(isBustMode || isReconstructMode) && !stlPreviewUrl ? (
-              <div className="bust-preview-hint">{isBustMode ? "Generate a bust to view the real STL mesh here." : "Start AI reconstruction to load the generated 3D mesh here."}</div>
+            {(isBustMode || isReconstructMode || isStatueMode) && !stlPreviewUrl ? (
+              <div className="bust-preview-hint">{isBustMode ? "Generate a bust to view the real STL mesh here." : (isStatueMode ? "Start AI statue generation to preview the generated bust mesh." : "Start AI reconstruction to load the generated 3D mesh here.")}</div>
             ) : null}
             <span className="axis-label axis-x">X+</span>
             <span className="axis-label axis-y">Y+</span>
@@ -617,7 +645,7 @@ export default function App() {
 
           <div className="forge-zone">
             <button type="button" className={`forge-btn ${forgeBusy ? "forge-btn-running" : ""}`} onClick={onForgeClick} disabled={!canGenerate}>
-              ⬡ {forgeBusy ? "FORGING..." : (isBustMode ? "FORGE BUST STL" : (isReconstructMode ? "RECONSTRUCT 3D" : "FORGE STL"))}
+              ⬡ {forgeBusy ? "FORGING..." : (isBustMode ? "FORGE BUST STL" : (isStatueMode ? "GENERATE STATUE" : (isReconstructMode ? "RECONSTRUCT 3D" : "FORGE STL")))}
             </button>
             <div className={`progress-container ${forgeBusy ? "visible" : ""}`}>
               <div className="progress-bar-bg"><div className="progress-bar-fill" /></div>
@@ -635,7 +663,7 @@ export default function App() {
             <div className="stat-card"><div><div className="stat-name">Vertex Count</div><div className="stat-val">{vertexCount.toLocaleString()}</div></div><div className="stat-unit">verts</div></div>
             <div className="stat-card"><div><div className="stat-name">Triangle Count</div><div className="stat-val">{triangleCount.toLocaleString()}</div></div><div className="stat-unit">tris</div></div>
             <div className="stat-card"><div><div className="stat-name">Estimated Size</div><div className="stat-val forge-col">{estimatedSize}</div></div><div className="stat-unit">MB</div></div>
-            <div className="stat-card"><div><div className="stat-name">Mode</div><div className="stat-val mode-val">{isBustMode ? bustStyle : (isReconstructMode ? reconstructPreset : activeMode)}</div></div><div className="stat-unit">profile</div></div>
+            <div className="stat-card"><div><div className="stat-name">Mode</div><div className="stat-val mode-val">{isBustMode ? bustStyle : ((isReconstructMode || isStatueMode) ? reconstructPreset : activeMode)}</div></div><div className="stat-unit">profile</div></div>
           </div>
 
           <div className="panel-section">
@@ -645,7 +673,7 @@ export default function App() {
               <div className="log-line info">{"[--] Redis limiter active"}</div>
               <div className="log-line ok">{"[OK] Worker preview online"}</div>
               <div className="log-line forge">{"[>>] Awaiting forge command"}</div>
-              <div className="log-line info">{"[--] Mode: "}{isBustMode ? "bust" : (isReconstructMode ? "reconstruct" : activeMode)}</div>
+              <div className="log-line info">{"[--] Mode: "}{isBustMode ? "bust" : (isStatueMode ? "statue" : (isReconstructMode ? "reconstruct" : activeMode))}</div>
             </div>
           </div>
         </aside>
